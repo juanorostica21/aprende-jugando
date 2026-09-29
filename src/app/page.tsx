@@ -194,8 +194,8 @@ export default function Home() {
       <div className="w-full max-w-2xl mt-8">
         
         <header className="mb-8 text-center">
-          <h1 className="text-3xl font-extrabold text-indigo-600 mb-2 flex items-center justify-center gap-2">
-            <BrainCircuit size={32} /> AprendeJugando
+          <h1 className="text-3xl font-extrabold text-indigo-600 mb-2 flex items-center justify-center gap-3">
+            <img src="/logo.svg" alt="AprendeJugando Logo" className="w-12 h-12 rounded-2xl shadow-sm" /> AprendeJugando
           </h1>
           <p className="text-slate-500">Misiones interactivas para mentes curiosas</p>
         </header>
