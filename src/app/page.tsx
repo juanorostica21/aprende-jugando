@@ -3,11 +3,20 @@
 import { useState, useMemo, useEffect } from "react";
 import { UploadCloud, BrainCircuit, Loader2, PlayCircle, Award, ImageIcon, ArrowLeft, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
 
+const SUBJECTS = [
+  { id: "General", icon: "🧠", label: "General" },
+  { id: "Matemáticas", icon: "🧮", label: "Matemáticas" },
+  { id: "Inglés", icon: "🇬🇧", label: "Inglés" },
+  { id: "Ciencias", icon: "🧬", label: "Ciencias" },
+  { id: "Historia", icon: "📜", label: "Historia" }
+];
+
 export default function Home() {
   const [phase, setPhase] = useState<"setup" | "loading" | "teach" | "quiz" | "result">("setup");
   const [file, setFile] = useState<File | null>(null);
   const [syllabusImage, setSyllabusImage] = useState<File | null>(null);
   const [instructions, setInstructions] = useState("");
+  const [subject, setSubject] = useState("General");
   
   const [lessonData, setLessonData] = useState<any>(null);
   const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
@@ -17,7 +26,6 @@ export default function Home() {
   const [score, setScore] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Quiz state
   const [quizState, setQuizState] = useState<"answering" | "feedback">("answering");
   const [isCorrect, setIsCorrect] = useState(false);
   const [correctAnswerStr, setCorrectAnswerStr] = useState("");
@@ -53,6 +61,7 @@ export default function Home() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("instructions", instructions);
+    formData.append("subject", subject);
     if (syllabusImage) formData.append("image", syllabusImage);
 
     try {
@@ -106,7 +115,7 @@ export default function Home() {
   };
 
   const handleTextSubmit = async () => {
-    if (textAnswer.trim().length < 2) {
+    if (textAnswer.trim().length < 1) {
       setQuizError("Por favor, escribe tu respuesta.");
       return;
     }
@@ -195,25 +204,42 @@ export default function Home() {
           <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
             <h2 className="text-xl font-bold mb-6">Prepara la Sesión de Estudio</h2>
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              {/* Selector de Asignatura */}
+              <div>
+                <label className="block font-bold mb-3 text-sm">1. Elige la Asignatura</label>
+                <div className="flex flex-wrap gap-2">
+                   {SUBJECTS.map(s => (
+                      <button 
+                        key={s.id} 
+                        onClick={() => setSubject(s.id)}
+                        className={`px-4 py-2 rounded-full border font-bold text-sm flex items-center gap-2 transition-colors ${subject === s.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                      >
+                        <span>{s.icon}</span> {s.label}
+                      </button>
+                   ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                 <label className="block border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
                   <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
                   <UploadCloud className="mx-auto w-8 h-8 text-slate-400 group-hover:text-indigo-500 mb-2" />
-                  <div className="font-bold text-sm">{file ? file.name : "1. Subir PDF del Libro"}</div>
+                  <div className="font-bold text-sm">{file ? file.name : "2. Subir PDF del Libro"}</div>
                 </label>
 
                 <label className="block border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files && setSyllabusImage(e.target.files[0])} />
                   <ImageIcon className="mx-auto w-8 h-8 text-slate-400 group-hover:text-indigo-500 mb-2" />
-                  <div className="font-bold text-sm">{syllabusImage ? syllabusImage.name : "2. Subir Foto Temario"}</div>
+                  <div className="font-bold text-sm">{syllabusImage ? syllabusImage.name : "3. Subir Temario"}</div>
                 </label>
               </div>
 
               <div>
-                <label className="block font-bold mb-2 text-sm">Instrucciones / Contexto</label>
+                <label className="block font-bold mb-2 text-sm">Instrucciones Adicionales (Opcional)</label>
                 <textarea 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 min-h-[100px] focus:outline-none focus:border-indigo-500 text-sm" 
-                  placeholder="Ej: 'Extrae de la foto lo que le toca a Ciencias y búscalo en el PDF.'"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 min-h-[80px] focus:outline-none focus:border-indigo-500 text-sm" 
+                  placeholder="Ej: 'Fíjate en lo que entra en la prueba, repasa mucho las divisiones.'"
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                 />
@@ -231,8 +257,8 @@ export default function Home() {
         {phase === "loading" && (
           <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-             <h2 className="text-xl font-bold mb-2">Creando la clase magistral...</h2>
-             <p className="text-slate-500 text-sm">El Agente está diseñando láminas, resúmenes y decenas de preguntas desafiantes.</p>
+             <h2 className="text-xl font-bold mb-2">Preparando clase de {subject}...</h2>
+             <p className="text-slate-500 text-sm">La IA está adaptando su método de enseñanza especialmente para esta materia.</p>
           </div>
         )}
 
@@ -252,7 +278,6 @@ export default function Home() {
                 {lessonData.lessons[currentLessonIdx].content}
               </div>
 
-              {/* Repaso / Mini Check */}
               <div className="bg-indigo-50 rounded-2xl p-6 border border-indigo-100">
                 <h4 className="font-bold text-indigo-900 mb-3 flex items-center gap-2"><BrainCircuit size={18}/> Repaso Rápido</h4>
                 <p className="mb-4 text-slate-800">{lessonData.lessons[currentLessonIdx].mini_check.question}</p>
@@ -295,11 +320,10 @@ export default function Home() {
             <div className="inline-block bg-orange-100 text-orange-800 font-bold px-3 py-1 rounded-full text-xs mb-4">🎯 Pregunta {currentQuizIdx + 1} de {lessonData.quiz.length}</div>
             
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm mb-8">
-              <h3 className="text-xl font-bold mb-6 text-slate-800">{currentQuestion.question}</h3>
+              <h3 className="text-xl font-bold mb-6 text-slate-800 whitespace-pre-wrap">{currentQuestion.question}</h3>
               
               {quizState === "answering" ? (
                 <>
-                  {/* Tipo: Alternativas o V/F */}
                   {(currentQuestion.type === "multiple_choice" || currentQuestion.type === "true_false") && (
                     <div className="grid grid-cols-1 gap-3">
                       {currentQuestion.options.map((opt: string, i: number) => (
@@ -310,12 +334,11 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Tipo: Desarrollo */}
                   {currentQuestion.type === "short_answer" && (
                     <div>
                       <textarea 
                         className="w-full border border-slate-300 rounded-xl p-4 text-sm focus:border-indigo-500 min-h-[120px] mb-4"
-                        placeholder="Escribe tu respuesta con tus propias palabras..."
+                        placeholder="Escribe tu respuesta aquí (o el resultado del cálculo)..."
                         value={textAnswer}
                         onChange={(e) => setTextAnswer(e.target.value)}
                         disabled={isEvaluating}
@@ -330,7 +353,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Tipo: Términos Pareados */}
                   {currentQuestion.type === "matching" && (
                     <div className="space-y-4">
                       {currentQuestion.pairs.map((pair: any, i: number) => (
@@ -358,7 +380,6 @@ export default function Home() {
                   {quizError && <div className="mt-4 text-red-600 font-medium text-sm text-center">⚠️ {quizError}</div>}
                 </>
               ) : (
-                /* FEEDBACK STATE */
                 <div className="animate-in zoom-in-95 duration-200">
                   <div className={`p-6 rounded-2xl mb-6 ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                     <h4 className={`text-lg font-bold flex items-center gap-2 ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
@@ -366,12 +387,10 @@ export default function Home() {
                       {isCorrect ? "¡Respuesta Correcta!" : "¡Ups! Incorrecto"}
                     </h4>
                     
-                    {/* Retroalimentación para Alternativas/Pareo */}
                     {!isCorrect && currentQuestion.type !== "short_answer" && (
                       <p className="mt-3 text-sm text-slate-700">La respuesta correcta era:<br/><strong className="text-red-800">{correctAnswerStr}</strong></p>
                     )}
                     
-                    {/* Retroalimentación Especial para Desarrollo usando IA */}
                     {currentQuestion.type === "short_answer" && (
                       <div className="mt-4 text-sm text-slate-700 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                         <strong className="block mb-2 text-indigo-700 flex items-center gap-2">

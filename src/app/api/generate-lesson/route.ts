@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     const image = formData.get('image') as File | null;
     const instructions = formData.get('instructions') as string;
+    const subject = formData.get('subject') as string || 'General';
 
     if (!file) {
       return NextResponse.json({ error: 'Falta el archivo principal (PDF)' }, { status: 400 });
@@ -27,22 +28,50 @@ export async function POST(req: NextRequest) {
         generationConfig: { responseMimeType: "application/json" } 
     });
 
+    let subjectInstructions = "";
+    if (subject === "Matemáticas") {
+       subjectInstructions = `
+       ESTRATEGIA PEDAGÓGICA PARA MATEMÁTICAS 🧮:
+       - No uses textos largos ni teoría aburrida.
+       - En las láminas (lessons), enseña CÓMO resolver los problemas paso a paso. Muestra ejemplos numéricos claros.
+       - En el mini_check y el quiz, enfócate en resolución de problemas (problemas de planteo o ejercicios directos).
+       - En "matching", haz que una operaciones con su resultado (ej. "5 x 4" con "20") o conceptos geométricos con su fórmula.
+       `;
+    } else if (subject === "Inglés") {
+       subjectInstructions = `
+       ESTRATEGIA PEDAGÓGICA PARA INGLÉS 🇬🇧:
+       - Enfócate en vocabulario, reglas gramaticales y comprensión.
+       - En las láminas, pon oraciones de ejemplo en inglés con su traducción al español.
+       - En "matching" (términos pareados), obliga al niño a cruzar palabras o frases cortas en inglés con su significado en español.
+       - En "short_answer", pide que traduzca frases o aplique reglas (ej. "Escribe esta oración en pasado").
+       `;
+    } else {
+       subjectInstructions = `
+       ESTRATEGIA PEDAGÓGICA CONCEPTUAL (Ciencias, Historia, General) 🧬:
+       - Desglosa bien los conceptos (ej. qué es, por qué pasa, ejemplos).
+       - Usa metáforas, datos curiosos, y analogías infantiles.
+       - "content" debe ser un texto explicativo (2 o 3 párrafos por tarjeta).
+       `;
+    }
+
     const prompt = `
       Eres el mejor profesor y agente pedagógico del mundo, especialista en niños y micro-learning. 
       Analiza los documentos adjuntos minuciosamente. El apoderado solicita: "${instructions || 'Enséñale los conceptos clave.'}"
       
+      Asignatura detectada: ${subject}
+      ${subjectInstructions}
+
       MISIÓN: Generar una sesión de estudio profunda, entretenida y altamente interactiva.
 
       PARTE 1: LA CLASE MAGISTRAL (10 a 15 tarjetas)
-      Crea entre 10 y 15 tarjetas ("lessons") con explicaciones detalladas (2 o 3 párrafos por tarjeta).
-      - Usa metáforas, datos curiosos, analogías infantiles y emojis.
+      Crea entre 10 y 15 tarjetas ("lessons") aplicando la estrategia pedagógica de la asignatura.
       - IMPORTANTE: Al final de cada tarjeta, debes incluir un "mini_check" (una pregunta rápida de alternativas de 3 opciones) para asegurarte de que el niño entendió ESA lámina antes de avanzar.
       
       PARTE 2: EVALUACIÓN MASIVA (20 preguntas en total)
-      Genera EXACTAMENTE 20 preguntas sobre lo enseñado, mezclando 4 tipos (5 de cada uno):
+      Genera EXACTAMENTE 20 preguntas sobre lo enseñado, mezclando 4 tipos equitativamente:
       1. "multiple_choice": Alternativas (4 opciones).
       2. "true_false": Verdadero o falso.
-      3. "short_answer": Pregunta de desarrollo donde el niño deba pensar y escribir. Provee una "correct_answer" como respuesta ideal.
+      3. "short_answer": Pregunta de desarrollo o cálculo matemático. Provee una "correct_answer" como respuesta ideal.
       4. "matching": Unión de conceptos. Debe incluir un array "pairs" con 3 o 4 pares de conceptos.
 
       Retorna un JSON ESTRICTAMENTE con esta estructura:
@@ -50,20 +79,20 @@ export async function POST(req: NextRequest) {
         "lessons": [
           { 
             "title": "...", 
-            "content": "Párrafos largos de explicación. Usa \\n\\n para separar párrafos. NO uses saltos de línea reales...", 
+            "content": "Contenido de la clase. Usa \\n\\n para separar párrafos o pasos. NO uses saltos de línea literales...", 
             "icon": "🌋",
             "mini_check": {
-              "question": "¿Qué es el magma?",
-              "options": ["Roca derretida", "Agua", "Viento"],
-              "correct_answer": "Roca derretida"
+              "question": "¿...",
+              "options": ["Opción 1", "Opción 2", "Opción 3"],
+              "correct_answer": "Opción 1"
             }
           }
         ],
         "quiz": [
           { "type": "multiple_choice", "question": "...", "options": ["A", "B", "C", "D"], "correct_answer": "A" },
           { "type": "true_false", "question": "...", "options": ["Verdadero", "Falso"], "correct_answer": "Falso" },
-          { "type": "short_answer", "question": "...", "correct_answer": "Puntos clave de la respuesta ideal..." },
-          { "type": "matching", "question": "...", "pairs": [ {"left": "Concepto 1", "right": "Definición 1"}, {"left": "Concepto 2", "right": "Definición 2"} ] }
+          { "type": "short_answer", "question": "...", "correct_answer": "Respuesta ideal..." },
+          { "type": "matching", "question": "...", "pairs": [ {"left": "Concepto 1", "right": "Definición 1"} ] }
         ]
       }
 
