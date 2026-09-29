@@ -235,14 +235,34 @@ export default function Home() {
                 </label>
               </div>
 
-              <div>
-                <label className="block font-bold mb-2 text-sm">Instrucciones Adicionales (Opcional)</label>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <label className="block font-bold mb-2 text-sm text-slate-700">Instrucciones para el Profesor IA (Opcional)</label>
+                <p className="text-xs text-slate-500 mb-3">Dile cómo quieres que le enseñe a tu hijo. La IA adaptará su lenguaje y dificultad.</p>
+                
                 <textarea 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 min-h-[80px] focus:outline-none focus:border-indigo-500 text-sm" 
-                  placeholder="Ej: 'Fíjate en lo que entra en la prueba, repasa mucho las divisiones.'"
+                  className="w-full bg-white border border-slate-300 rounded-xl p-3 min-h-[80px] focus:outline-none focus:border-indigo-500 text-sm shadow-sm" 
+                  placeholder="Ej: 'Fíjate en lo que entra en la foto del temario. Explícale como si fuera una historia de piratas.'"
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                 />
+                
+                <div className="flex flex-wrap gap-2 mt-3 items-center">
+                  <span className="text-xs text-slate-500 font-bold mr-1">💡 Autocompletar:</span>
+                  {[
+                    "Explícalo súper simple (niño de 8 años)",
+                    "Usa ejemplos de videojuegos",
+                    "Haz que las preguntas sean muy difíciles",
+                    "Enfócate solo en la Unidad 2"
+                  ].map((suggestion, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => setInstructions(prev => prev ? prev + " " + suggestion : suggestion)}
+                      className="text-[11px] bg-white text-slate-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 transition-colors border border-slate-200 shadow-sm"
+                    >
+                      + {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {errorMsg && <div className="text-red-600 font-medium text-sm">⚠️ {errorMsg}</div>}
