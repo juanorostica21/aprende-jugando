@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+export const maxDuration = 60; // Permite a Vercel esperar hasta 60s (Límite del plan Hobby)
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();

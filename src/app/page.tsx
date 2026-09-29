@@ -55,6 +55,17 @@ export default function Home() {
       setErrorMsg("Por favor, sube el PDF base primero.");
       return;
     }
+
+    // Validación de peso máximo para Vercel Serverless (aprox 4.5MB)
+    if (file.size > 4 * 1024 * 1024) {
+      setErrorMsg("El PDF es demasiado pesado (Máximo 4MB). Por favor comprímelo o sube un fragmento más pequeño.");
+      return;
+    }
+    if (syllabusImage && syllabusImage.size > 4 * 1024 * 1024) {
+      setErrorMsg("La imagen es demasiado pesada (Máximo 4MB).");
+      return;
+    }
+
     setErrorMsg("");
     setPhase("loading");
 
@@ -66,8 +77,16 @@ export default function Home() {
 
     try {
       const res = await fetch("/api/generate-lesson", { method: "POST", body: formData });
+      
+      // Prevenir el error de "Unexpected token 'R', Request Entity Too Large" al intentar parsear un texto plano
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+         throw new Error(`Error en el servidor (${res.status}): Probablemente el archivo es muy pesado o el tiempo de espera se agotó.`);
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error desconocido");
+      
       setLessonData(data);
       setPhase("teach");
     } catch (err: any) {
