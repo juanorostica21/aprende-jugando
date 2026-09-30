@@ -85,15 +85,23 @@ export default function Home() {
       }
 
       const prompt = `
-        Eres el mejor profesor del mundo. El apoderado solicita: "${instructions || 'Enséñale los conceptos clave.'}"
+        Eres un profesor experto y estratégico. El apoderado solicita: "${instructions || 'Enséñale los conceptos clave.'}"
         Asignatura: ${subject}. ${subjectInstructions}
 
-        MISIÓN:
-        PARTE 1: LA CLASE MAGISTRAL (10 a 15 tarjetas "lessons") con un "mini_check" (3 alternativas) en cada una.
-        PARTE 2: EVALUACIÓN MASIVA (20 preguntas en "quiz"). Usa tipos: multiple_choice, true_false, short_answer, matching.
+        REGLA DE FILTRADO ESTRICTO (CRÍTICO):
+        Si se incluye una imagen de un temario, debes cruzar esa información con el PDF. IGNORA por completo cualquier tema, página o concepto del PDF que NO esté explícitamente mencionado en el temario. Eres un filtro láser: enseña SOLO lo que entra en la prueba.
+
+        ESTRUCTURA DE LA SESIÓN:
+        PARTE 1: LA CLASE MAGISTRAL ("lessons")
+        - Adapta la cantidad de tarjetas a la cantidad de materia real. Pueden ser 4 tarjetas (para un temario corto) o hasta 15 (si es extenso). No inventes relleno.
+        - Incluye siempre un "mini_check" (pregunta de 3 alternativas) al final de cada tarjeta.
+        
+        PARTE 2: LA EVALUACIÓN ("quiz")
+        - Genera una evaluación proporcional a la materia enseñada (idealmente 20 preguntas, o al menos 10 si el tema es muy corto). 
+        - Usa de manera equilibrada los 4 tipos de preguntas: multiple_choice, true_false, short_answer, matching.
 
         Retorna un JSON ESTRICTAMENTE con la estructura: { "lessons": [{ "title": "", "content": "", "icon": "🌋", "mini_check": { "question": "", "options": ["","",""], "correct_answer": "" } }], "quiz": [{ "type": "multiple_choice", "question": "", "options": ["",""], "correct_answer": "" }] }
-        REGLA CRÍTICA: NO incluyas saltos de línea literales (Enter) dentro del JSON. Usa '\\n'.
+        REGLA TÉCNICA: NO incluyas saltos de línea literales (Enter) dentro del JSON. Usa '\\n'.
       `;
 
       const getBase64 = (f: File): Promise<string> => new Promise((resolve) => {
