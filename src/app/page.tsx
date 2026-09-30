@@ -261,7 +261,15 @@ export default function Home() {
     <main className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col items-center">
       <div className="w-full max-w-2xl mt-8">
         
-        <header className="mb-8 text-center">
+        <header className="mb-8 text-center relative flex flex-col items-center">
+          {phase !== "setup" && (
+            <button 
+              onClick={restart} 
+              className="absolute left-0 top-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1 transition-colors"
+            >
+              <ArrowLeft size={14}/> Salir
+            </button>
+          )}
           <h1 className="text-3xl font-extrabold text-indigo-600 mb-2 flex items-center justify-center gap-3">
             <img src="/logo.svg" alt="AprendeJugando Logo" className="w-12 h-12 rounded-2xl shadow-sm" /> AprendeJugando
           </h1>
