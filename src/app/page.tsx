@@ -56,41 +56,76 @@ export default function Home() {
       return;
     }
 
-    // Validación de peso máximo para Vercel Serverless (aprox 4.5MB)
-    if (file.size > 4 * 1024 * 1024) {
-      setErrorMsg("El PDF es demasiado pesado (Máximo 4MB). Por favor comprímelo o sube un fragmento más pequeño.");
-      return;
-    }
-    if (syllabusImage && syllabusImage.size > 4 * 1024 * 1024) {
-      setErrorMsg("La imagen es demasiado pesada (Máximo 4MB).");
+    if (file.size > 19 * 1024 * 1024) {
+      setErrorMsg("El PDF pesa más de 19MB. El límite directo de Google es 20MB. Usa un archivo un poco más liviano.");
       return;
     }
 
     setErrorMsg("");
     setPhase("loading");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("instructions", instructions);
-    formData.append("subject", subject);
-    if (syllabusImage) formData.append("image", syllabusImage);
-
     try {
-      const res = await fetch("/api/generate-lesson", { method: "POST", body: formData });
-      
-      // Prevenir el error de "Unexpected token 'R', Request Entity Too Large" al intentar parsear un texto plano
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-         throw new Error(`Error en el servidor (${res.status}): Probablemente el archivo es muy pesado o el tiempo de espera se agotó.`);
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Falta configurar NEXT_PUBLIC_GEMINI_API_KEY en Vercel.");
+
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ 
+          model: 'gemini-3.5-flash', 
+          generationConfig: { responseMimeType: "application/json" } 
+      });
+
+      let subjectInstructions = "";
+      if (subject === "Matemáticas") {
+         subjectInstructions = `ESTRATEGIA PEDAGÓGICA PARA MATEMÁTICAS 🧮:\n- Enseña CÓMO resolver paso a paso.\n- Usa ejercicios numéricos en el quiz.\n- Menos texto, más fórmulas y números.`;
+      } else if (subject === "Inglés") {
+         subjectInstructions = `ESTRATEGIA PEDAGÓGICA PARA INGLÉS 🇬🇧:\n- Enfócate en vocabulario y reglas gramaticales.\n- Pide traducciones en las preguntas.`;
+      } else {
+         subjectInstructions = `ESTRATEGIA PEDAGÓGICA CONCEPTUAL 🧬:\n- Desglosa conceptos, usa metáforas y analogías.\n- Textos explicativos profundos.`;
       }
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error desconocido");
+      const prompt = `
+        Eres el mejor profesor del mundo. El apoderado solicita: "${instructions || 'Enséñale los conceptos clave.'}"
+        Asignatura: ${subject}. ${subjectInstructions}
+
+        MISIÓN:
+        PARTE 1: LA CLASE MAGISTRAL (10 a 15 tarjetas "lessons") con un "mini_check" (3 alternativas) en cada una.
+        PARTE 2: EVALUACIÓN MASIVA (20 preguntas en "quiz"). Usa tipos: multiple_choice, true_false, short_answer, matching.
+
+        Retorna un JSON ESTRICTAMENTE con la estructura: { "lessons": [{ "title": "", "content": "", "icon": "🌋", "mini_check": { "question": "", "options": ["","",""], "correct_answer": "" } }], "quiz": [{ "type": "multiple_choice", "question": "", "options": ["",""], "correct_answer": "" }] }
+        REGLA CRÍTICA: NO incluyas saltos de línea literales (Enter) dentro del JSON. Usa '\\n'.
+      `;
+
+      const getBase64 = (f: File): Promise<string> => new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.readAsDataURL(f);
+      });
+
+      const parts: any[] = [
+        prompt,
+        { inlineData: { data: await getBase64(file), mimeType: "application/pdf" } }
+      ];
+
+      if (syllabusImage) {
+        parts.push({ inlineData: { data: await getBase64(syllabusImage), mimeType: syllabusImage.type || "image/jpeg" } });
+      }
+
+      const result = await model.generateContent(parts);
+      const responseText = result.response.text();
       
-      setLessonData(data);
+      let jsonResponse;
+      try {
+        jsonResponse = JSON.parse(responseText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, ''));
+      } catch (e) {
+        jsonResponse = JSON.parse(responseText);
+      }
+
+      setLessonData(jsonResponse);
       setPhase("teach");
     } catch (err: any) {
-      setErrorMsg(err.message);
+      console.error(err);
+      setErrorMsg(err.message || "Error al generar la clase.");
       setPhase("setup");
     }
   };
@@ -143,22 +178,28 @@ export default function Home() {
     setQuizError("");
 
     try {
-      const res = await fetch("/api/evaluate-answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: currentQuestion.question,
-          idealAnswer: currentQuestion.correct_answer,
-          studentAnswer: textAnswer
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Falta API Key");
+
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash', generationConfig: { responseMimeType: "application/json" } });
+
+      const prompt = `
+        Pregunta: "${currentQuestion.question}"
+        Respuesta ideal esperada: "${currentQuestion.correct_answer}"
+        Respuesta del estudiante: "${textAnswer}"
+        Tu tarea: Determinar si es correcta (true/false) y darle un feedback cariñoso al niño en 1 oración.
+        Retorna JSON: { "isCorrect": true/false, "feedback": "mensaje" }
+      `;
+
+      const result = await model.generateContent(prompt);
+      const data = JSON.parse(result.response.text().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, ''));
 
       setAiFeedback(data.feedback);
       submitQuizAnswer(data.isCorrect, currentQuestion.correct_answer);
     } catch (err) {
-      setQuizError("Hubo un error al evaluar tu respuesta. Intenta de nuevo.");
+      setQuizError("Hubo un error al evaluar tu respuesta con IA. Intenta de nuevo.");
     } finally {
       setIsEvaluating(false);
     }
