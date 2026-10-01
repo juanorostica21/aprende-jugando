@@ -98,10 +98,11 @@ export default function Home() {
     setHistoryLoading(true);
     setShowHistory(true);
     try {
-      const q = query(collection(db, "results"), where("userId", "==", user.uid), orderBy("date", "desc"));
+      const q = query(collection(db, "results"), where("userId", "==", user.uid));
       const querySnapshot = await getDocs(q);
       const results: any[] = [];
       querySnapshot.forEach((doc) => results.push({ id: doc.id, ...doc.data() }));
+      results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setHistoryData(results);
     } catch (err) {
       console.error("Error cargando historial", err);
@@ -142,21 +143,16 @@ export default function Home() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // --- MARKDOWN IMAGE PARSER ---
+  // --- FORMATTER ---
   const renderContent = (text: string) => {
-    const parts = text.split(/!\[(.*?)\]\((.*?)\)/g);
-    if (parts.length === 1) return text;
-    
-    const elements = [];
-    for (let i = 0; i < parts.length; i += 3) {
-      if (parts[i]) elements.push(<span key={i}>{parts[i]}</span>);
-      if (i + 1 < parts.length && i + 2 < parts.length) {
-        elements.push(
-          <img key={i+1} src={parts[i+2]} alt={parts[i+1]} className="w-full h-auto rounded-xl my-4 shadow-sm border border-slate-200 object-cover max-h-80" />
-        );
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="text-indigo-900 font-extrabold">{part.slice(2, -2)}</strong>;
       }
-    }
-    return elements;
+      return <span key={i}>{part}</span>;
+    });
   }
 
   // --- MAIN APP METHODS ---
@@ -190,15 +186,14 @@ export default function Home() {
         ESTRUCTURA DE LA SESIÓN:
         PARTE 1: LA CLASE MAGISTRAL ("lessons")
         - Tarjeta 1 (OBLIGATORIA): Debe ser un "Índice de Temas", enumerando explícitamente los temas extraídos del temario que se van a estudiar hoy.
-        - Tarjetas siguientes: Adapta la cantidad a la materia real (entre 3 y 15).
-        - IMÁGENES EDUCATIVAS: En el campo "content", incluye una imagen en formato Markdown exacto usando esta API dinámica: ![alt](https://image.pollinations.ai/prompt/{descripcion_en_ingles}?width=800&height=400&nologo=true). Ejemplo: ![Volcán](https://image.pollinations.ai/prompt/educational%20illustration%20volcano%20cross%20section?width=800&height=400&nologo=true). ¡Úsalo al menos en un par de tarjetas!
-        - REGLA CRÍTICA PARA EL MINI_CHECK: El campo "correct_answer" DEBE ser EXACTAMENTE IDÉNTICO letra por letra a UNA de las 3 "options".
+        - Tarjetas siguientes: Desarrolla PROFUNDAMENTE los temas filtrados. Genera entre 10 y 20 tarjetas. No seas superficial, el alumno necesita entender detalles de lo que SÍ entra. Usa emojis en el texto para compensar la falta de fotos. Usa formato Markdown **negrita** para destacar conceptos.
+        - REGLA CRÍTICA PARA EL MINI_CHECK: En lugar de un string, usarás "correct_index", que DEBE SER un número entero (0, 1 o 2) indicando cuál de las 3 "options" es la correcta.
         
         PARTE 2: LA EVALUACIÓN ("quiz")
         - Genera una evaluación proporcional a la materia enseñada (idealmente 20 preguntas). 
         - Usa de manera equilibrada los 4 tipos de preguntas: multiple_choice, true_false, short_answer, matching.
 
-        Retorna un JSON ESTRICTAMENTE con la estructura: { "lessons": [{ "title": "", "content": "", "icon": "🌋", "mini_check": { "question": "", "options": ["","",""], "correct_answer": "" } }], "quiz": [{ "type": "multiple_choice", "question": "", "options": ["",""], "correct_answer": "" }] }
+        Retorna un JSON ESTRICTAMENTE con la estructura: { "lessons": [{ "title": "", "content": "", "icon": "🌋", "mini_check": { "question": "", "options": ["","",""], "correct_index": 0 } }], "quiz": [{ "type": "multiple_choice", "question": "", "options": ["",""], "correct_answer": "" }] }
         REGLA TÉCNICA: NO incluyas saltos de línea literales dentro del JSON. Usa '\\n'.
       `;
 
@@ -233,9 +228,9 @@ export default function Home() {
     else { setPhase("quiz"); window.scrollTo(0,0); }
   };
 
-  const handleMiniCheck = (opt: string) => {
-    const correct = lessonData.lessons[currentLessonIdx].mini_check.correct_answer || "";
-    if (opt.trim().toLowerCase() === correct.trim().toLowerCase()) {
+  const handleMiniCheck = (optIndex: number) => {
+    const correctIdx = lessonData.lessons[currentLessonIdx].mini_check.correct_index;
+    if (optIndex === correctIdx) {
       setMiniCheckStatus("correct");
     } else {
       setMiniCheckStatus("incorrect");
@@ -469,7 +464,7 @@ export default function Home() {
                 <p className="mb-4 text-slate-800 font-medium">{lessonData.lessons[currentLessonIdx].mini_check.question}</p>
                 <div className="grid gap-3">
                   {lessonData.lessons[currentLessonIdx].mini_check.options.map((opt: string, i: number) => (
-                    <button key={i} onClick={() => handleMiniCheck(opt)} className="text-left bg-white border border-slate-200 p-4 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-sm font-medium">{opt}</button>
+                    <button key={i} onClick={() => handleMiniCheck(i)} className="text-left bg-white border border-slate-200 p-4 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-sm font-medium">{opt}</button>
                   ))}
                 </div>
                 {miniCheckStatus === "incorrect" && (
