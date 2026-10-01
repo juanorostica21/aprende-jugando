@@ -38,6 +38,7 @@ export default function Home() {
   const [lessonData, setLessonData] = useState<any>(null);
   const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
   const [miniCheckStatus, setMiniCheckStatus] = useState<"pending" | "correct" | "incorrect">("pending");
+  const [failedAttempts, setFailedAttempts] = useState(0);
   
   const [currentQuizIdx, setCurrentQuizIdx] = useState(0);
   const [score, setScore] = useState(0);
@@ -74,6 +75,7 @@ export default function Home() {
 
   useEffect(() => {
     setMiniCheckStatus("pending");
+    setFailedAttempts(0);
     window.speechSynthesis?.cancel();
     setIsSpeaking(false);
   }, [currentLessonIdx, phase]);
@@ -131,13 +133,31 @@ export default function Home() {
       setIsSpeaking(false);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(text);
+    const cleanText = text.replace(/!\[.*?\]\(.*?\)/g, ''); // Remover markdown de imagenes para la voz
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = "es-ES";
     utterance.rate = 0.9; 
     utterance.onend = () => setIsSpeaking(false);
     setIsSpeaking(true);
     window.speechSynthesis.speak(utterance);
   };
+
+  // --- MARKDOWN IMAGE PARSER ---
+  const renderContent = (text: string) => {
+    const parts = text.split(/!\[(.*?)\]\((.*?)\)/g);
+    if (parts.length === 1) return text;
+    
+    const elements = [];
+    for (let i = 0; i < parts.length; i += 3) {
+      if (parts[i]) elements.push(<span key={i}>{parts[i]}</span>);
+      if (i + 1 < parts.length && i + 2 < parts.length) {
+        elements.push(
+          <img key={i+1} src={parts[i+2]} alt={parts[i+1]} className="w-full h-auto rounded-xl my-4 shadow-sm border border-slate-200 object-cover max-h-80" />
+        );
+      }
+    }
+    return elements;
+  }
 
   // --- MAIN APP METHODS ---
   const handleStartClass = async () => {
@@ -165,19 +185,21 @@ export default function Home() {
         Asignatura: ${subject}. ${subjectInstructions}
 
         REGLA DE FILTRADO ESTRICTO (CRÍTICO):
-        Si se incluye una imagen de un temario, debes cruzar esa información con el PDF. IGNORA por completo cualquier tema, página o concepto del PDF que NO esté explícitamente mencionado en el temario. Eres un filtro láser: enseña SOLO lo que entra en la prueba.
+        Si se incluye una imagen de un temario, cruza esa información con el PDF. IGNORA por completo cualquier tema del PDF que NO esté explícitamente mencionado en el temario. Enseña SOLO lo que entra en la prueba.
 
         ESTRUCTURA DE LA SESIÓN:
         PARTE 1: LA CLASE MAGISTRAL ("lessons")
-        - Adapta la cantidad de tarjetas a la cantidad de materia real. Pueden ser 4 tarjetas (para un temario corto) o hasta 15 (si es extenso). No inventes relleno.
-        - Incluye siempre un "mini_check" (pregunta de 3 alternativas) al final de cada tarjeta.
+        - Tarjeta 1 (OBLIGATORIA): Debe ser un "Índice de Temas", enumerando explícitamente los temas extraídos del temario que se van a estudiar hoy.
+        - Tarjetas siguientes: Adapta la cantidad a la materia real (entre 3 y 15).
+        - IMÁGENES EDUCATIVAS: En el campo "content", incluye una imagen en formato Markdown exacto usando esta API dinámica: ![alt](https://image.pollinations.ai/prompt/{descripcion_en_ingles}?width=800&height=400&nologo=true). Ejemplo: ![Volcán](https://image.pollinations.ai/prompt/educational%20illustration%20volcano%20cross%20section?width=800&height=400&nologo=true). ¡Úsalo al menos en un par de tarjetas!
+        - REGLA CRÍTICA PARA EL MINI_CHECK: El campo "correct_answer" DEBE ser EXACTAMENTE IDÉNTICO letra por letra a UNA de las 3 "options".
         
         PARTE 2: LA EVALUACIÓN ("quiz")
-        - Genera una evaluación proporcional a la materia enseñada (idealmente 20 preguntas, o al menos 10 si el tema es muy corto). 
+        - Genera una evaluación proporcional a la materia enseñada (idealmente 20 preguntas). 
         - Usa de manera equilibrada los 4 tipos de preguntas: multiple_choice, true_false, short_answer, matching.
 
         Retorna un JSON ESTRICTAMENTE con la estructura: { "lessons": [{ "title": "", "content": "", "icon": "🌋", "mini_check": { "question": "", "options": ["","",""], "correct_answer": "" } }], "quiz": [{ "type": "multiple_choice", "question": "", "options": ["",""], "correct_answer": "" }] }
-        REGLA TÉCNICA: NO incluyas saltos de línea literales (Enter) dentro del JSON. Usa '\\n'.
+        REGLA TÉCNICA: NO incluyas saltos de línea literales dentro del JSON. Usa '\\n'.
       `;
 
       const getBase64 = (f: File): Promise<string> => new Promise((resolve) => {
@@ -212,7 +234,17 @@ export default function Home() {
   };
 
   const handleMiniCheck = (opt: string) => {
-    setMiniCheckStatus(opt === lessonData.lessons[currentLessonIdx].mini_check.correct_answer ? "correct" : "incorrect");
+    const correct = lessonData.lessons[currentLessonIdx].mini_check.correct_answer || "";
+    if (opt.trim().toLowerCase() === correct.trim().toLowerCase()) {
+      setMiniCheckStatus("correct");
+    } else {
+      setMiniCheckStatus("incorrect");
+      setFailedAttempts(prev => prev + 1);
+    }
+  };
+
+  const forceNextLesson = () => {
+    setMiniCheckStatus("correct");
   };
 
   const submitQuizAnswer = (correct: boolean, idealAnswer: string) => {
@@ -224,7 +256,7 @@ export default function Home() {
   };
 
   const handleMultipleChoice = (opt: string) => {
-    submitQuizAnswer(opt === currentQuestion.correct_answer, currentQuestion.correct_answer);
+    submitQuizAnswer(opt.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase(), currentQuestion.correct_answer);
   };
 
   const handleTextSubmit = async () => {
@@ -312,7 +344,7 @@ export default function Home() {
   if (showHistory) {
     return (
       <main className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col items-center">
-        <div className="w-full max-w-2xl mt-8">
+        <div className="w-full max-w-4xl mt-8">
           <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
             <button onClick={() => setShowHistory(false)} className="text-slate-500 hover:text-indigo-600 font-bold text-sm flex items-center gap-1"><ArrowLeft size={16}/> Volver</button>
             <h2 className="font-extrabold text-indigo-600 text-xl flex items-center gap-2"><History size={20}/> Historial de Estudio</h2>
@@ -347,7 +379,7 @@ export default function Home() {
   // --- MAIN APP UI ---
   return (
     <main className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col items-center">
-      <div className="w-full max-w-2xl mt-8">
+      <div className="w-full max-w-4xl mt-8 px-2 sm:px-0">
         
         <header className="mb-8 text-center relative flex flex-col items-center">
           {phase === "setup" ? (
@@ -409,7 +441,7 @@ export default function Home() {
           <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
              <h2 className="text-xl font-bold mb-2">Preparando clase de {subject}...</h2>
-             <p className="text-slate-500 text-sm">La IA está adaptando su método de enseñanza especialmente para esta materia.</p>
+             <p className="text-slate-500 text-sm">Analizando documentos, buscando imágenes y creando ejercicios...</p>
           </div>
         )}
 
@@ -424,23 +456,30 @@ export default function Home() {
             
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm mb-8 relative overflow-hidden">
               <button onClick={() => playVoice(lessonData.lessons[currentLessonIdx].content)} className={`absolute top-6 right-6 p-3 rounded-full flex items-center gap-2 font-bold text-sm transition-all ${isSpeaking ? 'bg-indigo-600 text-white shadow-lg animate-pulse' : 'bg-slate-100 text-indigo-600 hover:bg-indigo-100'}`}>
-                <Volume2 size={20}/> {isSpeaking ? "Pausar" : "Escuchar"}
+                <Volume2 size={20}/> <span className="hidden sm:inline">{isSpeaking ? "Pausar" : "Escuchar"}</span>
               </button>
               <div className="text-5xl mb-4 mt-2">{lessonData.lessons[currentLessonIdx].icon}</div>
-              <h3 className="text-2xl font-bold mb-4 text-indigo-700 w-3/4">{lessonData.lessons[currentLessonIdx].title}</h3>
-              <div className="text-lg leading-relaxed text-slate-700 bg-slate-50 p-5 rounded-2xl border-l-4 border-indigo-500 whitespace-pre-wrap mb-8">
-                {lessonData.lessons[currentLessonIdx].content}
+              <h3 className="text-3xl font-bold mb-6 text-indigo-700 w-3/4">{lessonData.lessons[currentLessonIdx].title}</h3>
+              <div className="text-lg leading-relaxed text-slate-700 bg-slate-50 p-6 rounded-2xl border-l-4 border-indigo-500 mb-8 whitespace-pre-wrap">
+                {renderContent(lessonData.lessons[currentLessonIdx].content)}
               </div>
 
               <div className="bg-indigo-50 rounded-2xl p-6 border border-indigo-100">
                 <h4 className="font-bold text-indigo-900 mb-3 flex items-center gap-2"><BrainCircuit size={18}/> Repaso Rápido</h4>
-                <p className="mb-4 text-slate-800">{lessonData.lessons[currentLessonIdx].mini_check.question}</p>
+                <p className="mb-4 text-slate-800 font-medium">{lessonData.lessons[currentLessonIdx].mini_check.question}</p>
                 <div className="grid gap-3">
                   {lessonData.lessons[currentLessonIdx].mini_check.options.map((opt: string, i: number) => (
-                    <button key={i} onClick={() => handleMiniCheck(opt)} className="text-left bg-white border border-slate-200 p-3 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-sm font-medium">{opt}</button>
+                    <button key={i} onClick={() => handleMiniCheck(opt)} className="text-left bg-white border border-slate-200 p-4 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-sm font-medium">{opt}</button>
                   ))}
                 </div>
-                {miniCheckStatus === "incorrect" && <div className="mt-4 text-red-600 font-medium text-sm flex items-center gap-1"><XCircle size={16}/> ¡Ups! Esa no es la correcta. Vuelve a leer e intenta de nuevo.</div>}
+                {miniCheckStatus === "incorrect" && (
+                  <div className="mt-4 text-red-600 font-medium text-sm flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-1"><XCircle size={16}/> ¡Ups! Esa no es la correcta. Intenta de nuevo.</span>
+                    {failedAttempts >= 2 && (
+                      <button onClick={forceNextLesson} className="text-indigo-600 underline text-xs font-bold hover:text-indigo-800">Me rindo, avanzar</button>
+                    )}
+                  </div>
+                )}
                 {miniCheckStatus === "correct" && (
                   <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4">
                     <div className="text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={18}/> ¡Excelente! Entendiste el concepto.</div>
