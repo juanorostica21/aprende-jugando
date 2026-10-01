@@ -223,6 +223,10 @@ export default function Home() {
     setQuizState("feedback");
   };
 
+  const handleMultipleChoice = (opt: string) => {
+    submitQuizAnswer(opt === currentQuestion.correct_answer, currentQuestion.correct_answer);
+  };
+
   const handleTextSubmit = async () => {
     if (textAnswer.trim().length < 1) { setQuizError("Por favor, escribe tu respuesta."); return; }
     setIsEvaluating(true);
